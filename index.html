@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Recognition Attendance</title>
+</head>
+<body>
+    <h1>Face Recognition Attendance System</h1>
+
+    <h2>Register Your Face</h2>
+    <label for="nameInput">Enter Your Name:</label>
+    <input type="text" id="nameInput" placeholder="Enter name" required>
+    <br><br>
+    <button onclick="showCamera('register')">Capture Using Camera</button>
+    
+    <form action="/register/upload" method="POST" enctype="multipart/form-data">
+        <input type="file" name="file" required>
+        <input type="text" name="name" placeholder="Enter name" required>
+        <button type="submit">Upload Image</button>
+    </form>    
+
+    <h2>Mark Attendance</h2>
+    <button onclick="showCamera('attendance')">Use Camera</button>
+
+    <h2>View Attendance Records</h2>
+    <a href="/attendance">Show Attendance</a>
+
+    <div id="cameraSection" style="display: none;">
+        <h2 id="cameraTitle"></h2>
+        <video id="video" width="640" height="480" autoplay></video>
+        <br>
+        <button id="capture">Capture Image</button>
+        <canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
+        <br>
+        <button id="submit" style="display:none;">Submit Image</button>
+        <button id="closeCamera" style="display:none;">Close Camera</button>
+    </div>
+
+    <script>
+        let mode = "";
+        const video = document.getElementById("video");
+        const canvas = document.getElementById("canvas");
+        const captureButton = document.getElementById("capture");
+        const submitButton = document.getElementById("submit");
+        const closeCameraButton = document.getElementById("closeCamera");
+        const context = canvas.getContext("2d");
+        const cameraSection = document.getElementById("cameraSection");
+        const cameraTitle = document.getElementById("cameraTitle");
+        const nameInput = document.getElementById("nameInput");
+        let stream = null;
+
+        function showCamera(selectedMode) {
+            mode = selectedMode;
+            cameraSection.style.display = "block";
+            cameraTitle.innerText = mode === "register" ? "Register Your Face" : "Mark Attendance";
+            submitButton.style.display = "none";
+            closeCameraButton.style.display = "block";
+
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(mediaStream => { 
+                    stream = mediaStream;
+                    video.srcObject = mediaStream;
+                })
+                .catch(error => { console.error("Camera access denied!", error); });
+        }
+
+        captureButton.addEventListener("click", () => {
+            if (mode === "register") {
+                const name = nameInput.value.trim();
+                if (!name) {
+                    alert("❌ Please enter your name before capturing the image.");
+                    return;
+                }
+            }
+
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            submitButton.style.display = "block";
+        });
+
+        submitButton.addEventListener("click", () => {
+    const name = nameInput.value.trim();
+    if (mode === "register" && name === "") {
+        alert("Please enter your name before capturing the image.");
+        return;
+    }
+
+    canvas.toBlob(blob => {
+        let formData = new FormData();
+        formData.append("file", blob, `${name}.jpg`);
+        formData.append("name", name);
+
+        fetch(mode === "register" ? "/register/camera" : "/recognize", { 
+            method: "POST", 
+            body: formData 
+        })
+        .then(response => response.text()) // Ensure response is handled as plain text
+        .then(data => alert(data))
+        .catch(error => console.error("Error:", error));
+    }, "image/jpeg");
+});
+
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+            }
+            cameraSection.style.display = "none";
+        }
+
+        closeCameraButton.addEventListener("click", stopCamera);
+    </script>
+</body>
+</html>
